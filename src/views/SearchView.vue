@@ -40,7 +40,6 @@ watch(scanInput, (newScanValue) => {
 
 <template>
   <div class="search-container">
-    <img src="/logo.png" alt="Company Logo" class="logo" />
     <h1>Fixed Asset Checker</h1>
     <p>Arahkan scan Anda ke kotak di bawah ini. Pencarian akan berjalan otomatis.</p>
 
