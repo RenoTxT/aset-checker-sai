@@ -6,7 +6,8 @@ import Papa from 'papaparse'
 // ------------------------------------------------------------------
 // !!! PENTING: GANTI DENGAN URL GOOGLE SHEET .CSV ANDA !!!
 // ------------------------------------------------------------------
-const GOOGLE_SHEET_URL = 'PASTE_URL_DARI_LANGKAH_0_ANDA_DI_SINI'
+const GOOGLE_SHEET_URL =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vTizT9NlMSSn77pWOCRVUoorr0GByWdrpmRCMMTZpRY89-Z4fpDu9z9b8FzQe5ruGu2Im88VLOkRjRP/pub?gid=0&single=true&output=csv'
 // ------------------------------------------------------------------
 
 const route = useRoute() // Untuk membaca parameter dari URL
