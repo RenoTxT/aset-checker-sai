@@ -1,51 +1,56 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue' // <-- 1. Impor 'watch'
 import { useRouter } from 'vue-router'
 
-// ref() digunakan untuk menyimpan data yang diketik pengguna
 const scanInput = ref('')
-// useRouter() digunakan untuk pindah halaman
 const router = useRouter()
 
-function searchAsset() {
-  if (!scanInput.value) {
-    alert('Silakan masukkan hasil pindaian QR')
-    return
-  }
+// Fungsi ini sekarang akan dipanggil oleh 'watch'
+function performSearch(scanValue) {
+  if (!scanValue) return // Keluar jika kosong
 
-  // Ini adalah logika untuk mem-parsing input Anda "e-Leasing:610000010479"
   let assetId = ''
-  if (scanInput.value.includes(':')) {
-    // Ambil bagian setelah "e-Leasing:"
-    assetId = scanInput.value.split(':')[1].trim()
+  if (scanValue.includes(':')) {
+    // Mem-parsing "e-Leasing:610000010479"
+    assetId = scanValue.split(':')[1].trim()
   } else {
-    // Jika pengguna hanya mengetik/paste nomornya saja
-    assetId = scanInput.value.trim()
+    // Jika hanya nomornya saja
+    assetId = scanValue.trim()
   }
 
-  if (assetId) {
-    // Pindah ke halaman detail, sambil membawa 'assetId' di URL
+  // 2. Tambahkan pengecekan panjang ID
+  // Aset nomor Anda panjangnya 12 digit (610000000675)
+  // Ini mencegah pencarian prematur jika ada yang mengetik manual
+  if (assetId && assetId.length >= 12) {
+    // 3. Langsung pindah halaman (eksekusi pencarian)
     router.push({ name: 'asset-detail', params: { id: assetId } })
-  } else {
-    alert('Format input tidak valid.')
+
+    // 4. Kosongkan input agar siap untuk scan berikutnya
+    scanInput.value = ''
   }
 }
+
+// 5. Ini adalah inti perubahannya
+// 'watch' akan mengawasi variabel scanInput
+// Begitu scanInput berubah, fungsi performSearch akan dipanggil
+watch(scanInput, (newScanValue) => {
+  performSearch(newScanValue)
+})
 </script>
 
 <template>
   <div class="search-container">
+    <img src="/logo.png" alt="Company Logo" class="logo" />
     <h1>Fixed Asset Checker</h1>
-    <p>Silakan pindai (scan) QR code pada nameplate aset dan tempel (paste) hasilnya di sini.</p>
+    <p>Arahkan scan Anda ke kotak di bawah ini. Pencarian akan berjalan otomatis.</p>
 
-    <form @submit.prevent="searchAsset">
-      <input
-        v-model="scanInput"
-        type="text"
-        placeholder="Contoh: e-Leasing:610000010479"
-        class="search-input"
-      />
-      <button type="submit" class="search-button">Cari Aset</button>
-    </form>
+    <input
+      v-model="scanInput"
+      type="text"
+      placeholder="Scan atau paste di sini..."
+      class="search-input"
+      autofocus
+    />
   </div>
 </template>
 
@@ -58,7 +63,7 @@ function searchAsset() {
   font-family: Arial, sans-serif;
 }
 .logo {
-  max-width: 150px; /* Atur ukuran logo Anda */
+  max-width: 150px;
   margin-bottom: 20px;
 }
 .search-input {
@@ -69,18 +74,5 @@ function searchAsset() {
   border: 2px solid #ccc;
   border-radius: 8px;
 }
-.search-button {
-  width: 100%;
-  padding: 12px 20px;
-  font-size: 18px;
-  font-weight: bold;
-  cursor: pointer;
-  background-color: #004a99; /* Ganti dengan warna perusahaan Anda */
-  color: white;
-  border: none;
-  border-radius: 8px;
-}
-.search-button:hover {
-  background-color: #003366;
-}
+/* 8. Kita sudah bisa hapus style untuk .search-button */
 </style>
