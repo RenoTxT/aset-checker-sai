@@ -1,54 +1,108 @@
 <script setup>
-import { ref, watch } from 'vue' // <-- 1. Impor 'watch'
+// 1. Impor 'onMounted' dan 'onBeforeUnmount' dari Vue
+// dan 'Html5QrcodeScanner' dari library baru kita
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import { Html5QrcodeScanner } from 'html5-qrcode'
 
-const scanInput = ref('')
 const router = useRouter()
+const scanInput = ref('') // Ini untuk input manual/fallback
 
-// Fungsi ini sekarang akan dipanggil oleh 'watch'
-function performSearch(scanValue) {
-  if (!scanValue) return // Keluar jika kosong
+// 2. Variabel untuk menyimpan instance scanner
+const scanner = ref(null)
+
+// 3. Fungsi untuk mem-parsing ID dan pindah halaman
+// Kita akan panggil ini dari 2 tempat:
+// (A) dari hasil scan, (B) dari input manual
+function navigateToAsset(scannedText) {
+  if (!scannedText) return
 
   let assetId = ''
-  if (scanValue.includes(':')) {
-    // Mem-parsing "e-Leasing:610000010479"
-    assetId = scanValue.split(':')[1].trim()
+  if (scannedText.includes(':')) {
+    assetId = scannedText.split(':')[1].trim()
   } else {
-    // Jika hanya nomornya saja
-    assetId = scanValue.trim()
+    assetId = scannedText.trim()
   }
 
-  // 2. Tambahkan pengecekan panjang ID
-  // Aset nomor Anda panjangnya 12 digit (610000000675)
-  // Ini mencegah pencarian prematur jika ada yang mengetik manual
   if (assetId && assetId.length >= 12) {
-    // 3. Langsung pindah halaman (eksekusi pencarian)
-    router.push({ name: 'asset-detail', params: { id: assetId } })
+    // Hentikan scanner SEBELUM pindah halaman
+    stopScanner()
 
-    // 4. Kosongkan input agar siap untuk scan berikutnya
-    scanInput.value = ''
+    // Pindah ke halaman detail
+    router.push({ name: 'asset-detail', params: { id: assetId } })
   }
 }
 
-// 5. Ini adalah inti perubahannya
-// 'watch' akan mengawasi variabel scanInput
-// Begitu scanInput berubah, fungsi performSearch akan dipanggil
+// 4. Fungsi 'watch' untuk input manual (fallback)
 watch(scanInput, (newScanValue) => {
-  performSearch(newScanValue)
+  // Jika ada input manual, kita panggil fungsi yang sama
+  navigateToAsset(newScanValue)
+})
+
+// 5. Ini adalah fungsi yang dipanggil library saat scan BERHASIL
+function onScanSuccess(decodedText, decodedResult) {
+  console.log(`Scan berhasil: ${decodedText}`, decodedResult)
+
+  // Panggil fungsi navigasi kita
+  navigateToAsset(decodedText)
+}
+
+// Fungsi yang dipanggil saat scan GAGAL (opsional)
+function onScanFailure(error) {
+  // console.warn(`Scan Gagal, error: ${error}`)
+  // Biarkan saja, scanner akan terus mencoba
+}
+
+// 6. Fungsi untuk menghentikan scanner & mematikan kamera
+function stopScanner() {
+  if (scanner.value) {
+    scanner.value.clear() // Hentikan scan & matikan kamera
+    console.log('Scanner dihentikan.')
+  }
+}
+
+// 7. 'onMounted' berjalan saat halaman dimuat
+onMounted(() => {
+  // Konfigurasi scanner
+  const config = {
+    fps: 10, // 10 frame per second
+    qrbox: { width: 250, height: 250 }, // Ukuran kotak bidik
+    rememberLastUsedCamera: true,
+  }
+
+  // Buat instance scanner baru
+  scanner.value = new Html5QrcodeScanner(
+    'qr-reader', // ID dari elemen <div> di template
+    config,
+    /* verbose= */ false,
+  )
+
+  // Mulai render scanner
+  scanner.value.render(onScanSuccess, onScanFailure)
+  console.log('Scanner QR dimulai...')
+})
+
+// 8. 'onBeforeUnmount' berjalan saat kita meninggalkan halaman
+// Ini SANGAT PENTING untuk mematikan kamera
+onBeforeUnmount(() => {
+  stopScanner()
 })
 </script>
 
 <template>
   <div class="search-container">
     <h1>Fixed Asset Checker</h1>
-    <p>Arahkan scan Anda ke kotak di bawah ini. Pencarian akan berjalan otomatis.</p>
+    <p>Arahkan kamera ke QR Code di bawah ini.</p>
+
+    <div id="qr-reader"></div>
+
+    <p class="separator">atau</p>
 
     <input
       v-model="scanInput"
       type="text"
-      placeholder="Scan atau paste di sini..."
+      placeholder="Paste manual di sini..."
       class="search-input"
-      autofocus
     />
   </div>
 </template>
@@ -56,22 +110,32 @@ watch(scanInput, (newScanValue) => {
 <style scoped>
 .search-container {
   max-width: 600px;
-  margin: 40px auto;
+  margin: 20px auto;
   padding: 20px;
   text-align: center;
   font-family: Arial, sans-serif;
 }
-.logo {
-  max-width: 150px;
-  margin-bottom: 20px;
+
+/* 11. Style untuk viewfinder scanner */
+#qr-reader {
+  width: 100%;
+  max-width: 500px;
+  margin: 10px auto;
+  border: 2px solid #ccc;
+  border-radius: 8px;
 }
+
+.separator {
+  margin: 20px 0;
+  font-weight: bold;
+  color: #555;
+}
+
 .search-input {
   width: 95%;
   padding: 12px;
   font-size: 16px;
-  margin: 20px 0;
   border: 2px solid #ccc;
   border-radius: 8px;
 }
-/* 8. Kita sudah bisa hapus style untuk .search-button */
 </style>
