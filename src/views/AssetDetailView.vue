@@ -14,7 +14,7 @@ const GOOGLE_SHEET_READ_URL =
 // 2. URL "WRITE API" ANDA - DARI LOG ERROR ANDA
 // ------------------------------------------------------------------
 const GOOGLE_SCRIPT_WRITE_URL =
-  'https://script.google.com/macros/s/AKfycbz-RTJXVHpYIlM-wMo8G23tacBs9FB-kCBeYK3nrT6EDDCPDq9IMm73646Z4p5l2Vo_kQ/exec'
+  'https://script.google.com/macros/s/AKfycbzN9bZ0Ol5r-ade5dXiq9RR9bovuVmfIUO3WghTTTf27mk6-knF6QhS9MQ28pg5HMFCKg/exec'
 // ------------------------------------------------------------------
 
 const route = useRoute()
@@ -120,11 +120,14 @@ function backToSearch() {
   <div class="detail-container">
     <button @click="backToSearch" class="back-button">&laquo; Kembali ke Scan</button>
 
+    <!-- Tampilan saat Loading -->
     <div v-if="loading" class="status-box">
       <h2>Mencari data aset...</h2>
     </div>
 
+    <!-- Tampilan jika Aset DITEMUKAN -->
     <div v-else-if="asset" class="asset-wrapper">
+      <!-- Bagian 1: Menampilkan data (Read-Only) -->
       <div class="asset-info">
         <h1>Detail Aset</h1>
         <div class="info-item">
@@ -143,6 +146,7 @@ function backToSearch() {
 
       <hr class="divider" />
 
+      <!-- Bagian 2: Form untuk INPUT data baru -->
       <div class="asset-form">
         <h2>Input / Update Data</h2>
 
@@ -172,6 +176,7 @@ function backToSearch() {
             <input id="model" v-model="inputModel" type="text" placeholder="Masukkan model" />
           </div>
 
+          <!-- Perbaikan typo type.submit" menjadi type="submit" -->
           <button type="submit" class="submit-button" :disabled="isSubmitting">
             {{ isSubmitting ? 'Menyimpan...' : 'Simpan Data' }}
           </button>
@@ -183,11 +188,14 @@ function backToSearch() {
       </div>
     </div>
 
+    <!-- Perbaikan urutan v-else-if -->
+    <!-- Tampilan jika ada Error (misal: Gagal load / API error) -->
     <div v-else-if="error" class="status-box error">
       <h1>Terjadi Kesalahan</h1>
       <p>{{ error }}</p>
     </div>
 
+    <!-- Tampilan jika Aset TIDAK DITEMUKAN -->
     <div v-else class="status-box error">
       <h1>Aset Tidak Ditemukan</h1>
       <p>
