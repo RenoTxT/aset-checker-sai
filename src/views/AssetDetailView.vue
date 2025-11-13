@@ -14,7 +14,7 @@ const GOOGLE_SHEET_READ_URL =
 // 2. URL "WRITE API" ANDA - DARI LOG ERROR ANDA
 // ------------------------------------------------------------------
 const GOOGLE_SCRIPT_WRITE_URL =
-  'https://script.google.com/macros/s/AKfycbzN9bZ0Ol5r-ade5dXiq9RR9bovuVmfIUO3WghTTTf27mk6-knF6QhS9MQ28pg5HMFCKg/exec'
+  'https://script.google.com/macros/s/AKfycbxHjhPMK20NIJP-g7F5d2aQb0szHTNR4gJGd-_nJZHUpzlGt_r5xISFfO7gbkMIEjPN/exec'
 // ------------------------------------------------------------------
 
 const route = useRoute()
