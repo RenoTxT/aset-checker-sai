@@ -4,108 +4,204 @@ import { useRoute, useRouter } from 'vue-router'
 import Papa from 'papaparse'
 
 // ------------------------------------------------------------------
-// !!! PENTING: GANTI DENGAN URL GOOGLE SHEET .CSV ANDA !!!
+// 1. URL BACA DATA (READ-ONLY) - URL .csv Anda
 // ------------------------------------------------------------------
-const GOOGLE_SHEET_URL =
+const GOOGLE_SHEET_READ_URL =
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vTizT9NlMSSn77pWOCRVUoorr0GByWdrpmRCMMTZpRY89-Z4fpDu9z9b8FzQe5ruGu2Im88VLOkRjRP/pub?gid=0&single=true&output=csv'
 // ------------------------------------------------------------------
 
-const route = useRoute() // Untuk membaca parameter dari URL
-const router = useRouter() // Untuk tombol "Kembali"
+// ------------------------------------------------------------------
+// 2. URL "WRITE API" ANDA - DARI LOG ERROR ANDA
+// ------------------------------------------------------------------
+const GOOGLE_SCRIPT_WRITE_URL =
+  'https://script.google.com/macros/s/AKfycbz-RTJXVHpYIlM-wMo8G23tacBs9FB-kCBeYK3nrT6EDDCPDq9IMm73646Z4p5l2Vo_kQ/exec'
+// ------------------------------------------------------------------
 
-const assetId = ref(route.params.id) // Ambil '610000010479' dari URL
-const asset = ref(null) // Untuk menyimpan data aset yang ditemukan
+const route = useRoute()
+const router = useRouter()
+
+const assetId = ref(route.params.id)
+const asset = ref(null) // Data dari PapaParse (Read-Only)
 const loading = ref(true)
 const error = ref(null)
 
-// onMounted() adalah fungsi yang berjalan otomatis saat halaman dibuka
+// Variabel untuk menampung data inputan
+const inputPartNumber = ref('')
+const inputModel = ref('')
+const inputAssetName = ref('')
+
+// Variabel status untuk proses submit
+const isSubmitting = ref(false)
+const submitMessage = ref(null)
+
+// Fungsi yang berjalan saat halaman dibuka
 onMounted(() => {
-  if (!GOOGLE_SHEET_URL.includes('http')) {
-    error.value = 'URL Google Sheet belum diatur. Silakan cek file AssetDetailView.vue'
-    loading.value = false
-    return
-  }
-
-  // Gunakan PapaParse untuk mengambil dan membaca data CSV dari URL
-  Papa.parse(GOOGLE_SHEET_URL, {
-    download: true, // Download file dari URL
-    header: true, // Gunakan Baris 1 sebagai 'key' (penting!)
+  Papa.parse(GOOGLE_SHEET_READ_URL, {
+    download: true,
+    header: true,
     complete: (results) => {
-      // 'results.data' adalah array dari semua data aset Anda
-      const allAssets = results.data
-
-      // Cari aset yang 'Asset Number'-nya sama dengan 'assetId' dari URL
-      // Pastikan nama kolom 'Asset Number' di Google Sheet Anda sama persis
-      asset.value = allAssets.find((row) => row['Asset Number'] === assetId.value)
-
-      loading.value = false // Selesai loading
+      const data = results.data
+      asset.value = data.find(
+        (row) => row['Asset Number'] && row['Asset Number'].toString().trim() === assetId.value,
+      )
+      if (asset.value) {
+        inputPartNumber.value = asset.value['Serial No. / Parts No.'] || ''
+        inputAssetName.value = asset.value['Asset Name'] || ''
+        inputModel.value = asset.value.Model || ''
+      }
+      loading.value = false
     },
     error: (err) => {
-      error.value = 'Gagal memuat data dari Google Sheet. Cek koneksi atau URL.'
+      error.value = 'Gagal memuat data dari Google Sheet: ' + err.message
       loading.value = false
     },
   })
 })
 
+// ==================================================================
+// FUNGSI submitData() YANG SUDAH DIPERBAIKI
+// ==================================================================
+async function submitData() {
+  if (!inputPartNumber.value || !inputModel.value || !inputAssetName.value) {
+    submitMessage.value = {
+      type: 'error',
+      text: 'Semua data (Part No, Asset Name, Model) wajib diisi.',
+    }
+    return
+  }
+
+  isSubmitting.value = true
+  submitMessage.value = null
+
+  try {
+    const response = await fetch(GOOGLE_SCRIPT_WRITE_URL, {
+      method: 'POST',
+      // 1. KEMBALIKAN KE 'cors' AGAR BISA BACA RESPON
+      mode: 'cors',
+
+      headers: {
+        // 2. GANTI 'application/json' MENJADI 'text/plain'
+        // Ini adalah FIX UTAMA untuk menghindari redirect Google
+        'Content-Type': 'text/plain',
+      },
+
+      // 3. Body tetap dikirim sebagai string JSON
+      body: JSON.stringify({
+        assetId: assetId.value,
+        partNumber: inputPartNumber.value,
+        model: inputModel.value,
+        assetName: inputAssetName.value,
+      }),
+    })
+
+    // 4. SEKARANG KITA BISA BACA RESPONNYA DENGAN AMAN
+    const result = await response.json()
+
+    if (result.status === 'success') {
+      submitMessage.value = { type: 'success', text: result.message }
+    } else {
+      submitMessage.value = { type: 'error', text: 'Error dari API: ' + result.message }
+    }
+  } catch (err) {
+    // 5. Kembalikan ke error handling normal
+    submitMessage.value = { type: 'error', text: 'Gagal menghubungi server API: ' + err.message }
+  } finally {
+    isSubmitting.value = false
+  }
+}
+// ==================================================================
+
 function backToSearch() {
-  router.push('/') // Kembali ke halaman utama
+  router.push('/')
 }
 </script>
 
 <template>
   <div class="detail-container">
-    <button @click="backToSearch" class="back-button">&laquo; Kembali ke Pencarian</button>
+    <button @click="backToSearch" class="back-button">&laquo; Kembali ke Scan</button>
 
     <div v-if="loading" class="status-box">
       <h2>Mencari data aset...</h2>
     </div>
 
-    <div v-else-if="asset" class="asset-info">
-      <h1>Detail Aset</h1>
-      <div class="info-item">
-        <strong>Nomor Aset:</strong>
-        <span>{{ asset['Asset Number'] }}</span>
+    <div v-else-if="asset" class="asset-wrapper">
+      <div class="asset-info">
+        <h1>Detail Aset</h1>
+        <div class="info-item">
+          <strong>Nomor Aset:</strong>
+          <span>{{ asset['Asset Number'] }}</span>
+        </div>
+        <div class="info-item">
+          <strong>Deskripsi Aset:</strong>
+          <span>{{ asset['Asset Description'] }}</span>
+        </div>
+        <div class="info-item">
+          <strong>Lokasi:</strong>
+          <span>{{ asset['Location'] }}</span>
+        </div>
       </div>
-      <div class="info-item">
-        <strong>Deskripsi Aset:</strong>
-        <span>{{ asset['Asset Description'] }}</span>
-      </div>
-      <div class="info-item">
-        <strong>Lokasi:</strong>
-        <span>{{ asset['Location'] }}</span>
-      </div>
-      <div class="info-item">
-        <strong>Serial No. / Parts No.:</strong>
-        <span>{{ asset['Serial No. / Parts No.'] }}</span>
-      </div>
-      <div class="info-item">
-        <strong>Tanggal Akuisisi:</strong>
-        <span>{{ asset['Acquisition Date'] }}</span>
-      </div>
-      <div class="info-item">
-        <strong>Kondisi:</strong>
-        <span>{{ asset['Condition'] }}</span>
-      </div>
-    </div>
 
-    <div v-else-if="!loading && !asset" class="status-box error">
-      <h1>Aset Tidak Ditemukan</h1>
-      <p>
-        Aset dengan nomor <strong>{{ assetId }}</strong> tidak dapat ditemukan di database.
-      </p>
+      <hr class="divider" />
+
+      <div class="asset-form">
+        <h2>Input / Update Data</h2>
+
+        <form @submit.prevent="submitData">
+          <div class="form-group">
+            <label for="partNumber">Part Number (Serial No.):</label>
+            <input
+              id="partNumber"
+              v-model="inputPartNumber"
+              type="text"
+              placeholder="Masukkan part number"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="assetName">Asset Name:</label>
+            <input
+              id="assetName"
+              v-model="inputAssetName"
+              type="text"
+              placeholder="Masukkan nama aset"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="model">Model:</label>
+            <input id="model" v-model="inputModel" type="text" placeholder="Masukkan model" />
+          </div>
+
+          <button type="submit" class="submit-button" :disabled="isSubmitting">
+            {{ isSubmitting ? 'Menyimpan...' : 'Simpan Data' }}
+          </button>
+        </form>
+
+        <div v-if="submitMessage" :class="['submit-status', submitMessage.type]">
+          {{ submitMessage.text }}
+        </div>
+      </div>
     </div>
 
     <div v-else-if="error" class="status-box error">
       <h1>Terjadi Kesalahan</h1>
       <p>{{ error }}</p>
     </div>
+
+    <div v-else class="status-box error">
+      <h1>Aset Tidak Ditemukan</h1>
+      <p>
+        Aset dengan nomor <strong>{{ assetId }}</strong> tidak dapat ditemukan.
+      </p>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* Style tidak berubah */
 .detail-container {
   max-width: 800px;
-  margin: 40px auto;
+  margin: 20px auto;
   padding: 20px;
   font-family: Arial, sans-serif;
   border: 1px solid #ddd;
@@ -115,7 +211,7 @@ function backToSearch() {
 .asset-info {
   display: flex;
   flex-direction: column;
-  gap: 16px; /* Jarak antar item */
+  gap: 16px;
 }
 .info-item {
   display: flex;
@@ -151,5 +247,59 @@ function backToSearch() {
   background-color: #ffd2d2;
   border: 1px solid #d8000c;
   border-radius: 8px;
+}
+.divider {
+  border: 0;
+  border-top: 2px solid #eee;
+  margin: 30px 0;
+}
+.asset-form h2 {
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 10px;
+}
+.form-group {
+  margin-bottom: 20px;
+}
+.form-group label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+.form-group input {
+  width: 95%;
+  padding: 12px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+.submit-button {
+  width: 100%;
+  padding: 12px 20px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 8px;
+}
+.submit-button:disabled {
+  background-color: #aaa;
+}
+.submit-status {
+  margin-top: 15px;
+  padding: 10px;
+  border-radius: 5px;
+  text-align: center;
+}
+.submit-status.success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+.submit-status.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
 }
 </style>
